@@ -1,68 +1,103 @@
 require 'dbf/dbf'
 require 'iconv'
-require 'active_support'
-require 'active_record'
+require 'sqlite3'
 $KCODE = 'u'
 
 class Kladr
+
+  def prepare_database
+	  @db = SQLite3::Database.new("kladr.sqlite3")
+		kladr_code = "
+		  region_code integer,
+			district_code integer,
+			city_code integer,
+			town_code integer,
+			"
+		@db.execute("CREATE TABLE IF NOT EXISTS streets (
+		  id integer primary key autoincrement, 
+			#{kladr_code}
+			street_code integer,
+			name varchar(60),
+			abbrev varchar(10)
+			)")
+		@db
+	end
+
   
-  def self.exec_streets_schema
-    ActiveRecord::Migration.create_table "streets" do |t|
-      t.column "name", :string, :limit => 40
-      t.column "street_code", :integer
-      t.column "abbrev", :string, :limit => 10
-    end
-    ActiveRecord::Migration.add_index :streets, :street_code
-    ActiveRecord::Migration.add_index :streets, :name
-  end
-  
-  
-  class Street < ActiveRecord::Base
-    has_many :houses
-  end   
-  
-  class House < ActiveRecord::Base
-    belongs_to :street
-  end
-  
-  def self.file_unpack(file)
+  def file_unpack(file)
     return if File.exists?(file)
     return unless File.exists?(file+".gz")
     `gzip -cd #{file}.gz > #{file}`
   end
   
-  def self.recode(string)
+  def recode(string)
     Iconv.iconv("UTF-8", "CP866", string).first
   end
-  
-  def self.street_import(file = File.dirname(__FILE__)+"/../BASE/STREET.DBF")
+
+	def extract_kladr_code(record)
+    region_code = record.attributes["code"][0,2].to_i
+		district_code = record.attributes["code"][2,3].to_i
+		city_code = record.attributes["code"][5,3].to_i
+		town_code = record.attributes["code"][8,3].to_i
+    street_code = record.attributes["code"][11, 4].to_i
+    actuality_code = record.attributes["code"][15,2].to_i
+    name = recode(record.attributes["name"])
+		abbrev = recode(record.attributes["socr"])
+		[region_code, district_code, city_code, town_code, street_code, name, abbrev, actuality_code]
+	end
+
+	def kladr_import(file = File.dirname(__FILE__)+"/../BASE/KLADR.DBF")
     start_time = Time.now
     file_unpack(file)
     table = Kladr::DBF::Table.new(file, :in_memory => false)
     table.columns.each {|c| c.name.replace(c.name.downcase) }
     
-    exec_streets_schema rescue false
-    
-    table_columns = Street.columns.map(&:name)
-    
-    puts "Table created, importing #{table.record_count} records"
+    puts "Table kladr created, importing #{table.record_count} records"
     count = 0
+		insert = @db.prepare("INSERT INTO streets (region_code, district_code, city_code, town_code, street_code, name, abbrev) VALUES (?,?,?,?,?,?,?)")
+
     0.upto(table.record_count-1) do |i|
       record = table.record(i) 
       next unless record
-      city_code = record.attributes["code"][0,2].to_i
-      street_code = record.attributes["code"][11, 4].to_i
-      actuality_code = record.attributes["code"][15,2].to_i
-      
-      next unless city_code == 77 && actuality_code == 0
-      attributes = {:street_code => street_code, :name => recode(record.attributes["name"]), :abbrev => recode(record.attributes["socr"])}.
-        reject {|field, value| !table_columns.include?(field.to_s)}
-      street = Street.create(attributes)
-      puts ("%4d %s %s" % [street.street_code, street.abbrev, street.name]) 
-      count += 1
-      if count == 1
-        puts "Starting Moscow on #{i} record"
-      end
+      kladr_code = extract_kladr_code(record)
+			puts kladr_code.inspect
+			count += 1
+			#exit if count == 400
+			next
+			
+			actiality_code = kladr_code.pop
+      next unless actuality_code == 0
+			
+      kladr_code << (name = recode(record.attributes["name"]))
+		end
+	end
+  
+  def street_import(file = File.dirname(__FILE__)+"/../BASE/STREET.DBF")
+    start_time = Time.now
+    file_unpack(file)
+    table = Kladr::DBF::Table.new(file, :in_memory => false)
+    table.columns.each {|c| c.name.replace(c.name.downcase) }
+    
+    puts "Table created, importing #{table.record_count} records"
+    count = 0
+		insert = @db.prepare("INSERT INTO streets (region_code, district_code, city_code, town_code, street_code, name, abbrev) VALUES (?,?,?,?,?,?,?)")
+
+    0.upto(table.record_count-1) do |i|
+      record = table.record(i) 
+      next unless record
+			
+      kladr_code = extract_kladr_code(record)
+			actiality_code = kladr_code.pop
+      next unless actuality_code == 0
+			
+
+			insert.execute!(*kladr_code)
+
+      #puts ("%4d %s %s" % [street_code, abbrev, name]) if region_code ==77
+      #count += 1 if region_code == 77
+      #if count == 1
+      #  puts "Starting Moscow on #{i} record"
+      #end
     end
     import_time = Time.now
     
@@ -82,7 +117,7 @@ class Kladr
     ActiveRecord::Migration.add_index :houses, [:street_code, :house_code]
   end
   
-  def self.houses_import(file = File.dirname(__FILE__)+"/../BASE/DOMA.DBF")
+  def houses_import(file = File.dirname(__FILE__)+"/../BASE/DOMA.DBF")
     start_time = Time.now
     file_unpack(file)
     table = Kladr::DBF::Table.new(file, :in_memory => false)
@@ -142,9 +177,11 @@ class Kladr
     end
   end
   
-  def self.import
+  def import
+	  prepare_database
+		kladr_import
     street_import
-    houses_import
+    #houses_import
   end  
   
 end
