@@ -129,19 +129,6 @@ class Kladr
     puts "It took #{import_time - start_time} seconds to import #{count} records. #{Time.now - import_time} to build index."
   end
   
-  def self.exec_houses_schema
-    ActiveRecord::Migration.create_table "houses" do |t|
-      t.column "number", :string, :limit => 10
-      t.column "street_code", :integer
-      t.column "abbrev", :string, :limit => 10
-      t.column "building", :integer
-      t.column "index", :integer
-      t.column "house_code", :integer
-      t.column "street_id", :integer
-    end
-    ActiveRecord::Migration.add_index :houses, [:street_code, :house_code]
-  end
-  
   def houses_import(file = File.dirname(__FILE__)+"/../BASE/DOMA.DBF")
     start_time = Time.now
     file_unpack(file)
@@ -215,19 +202,13 @@ class Kladr
     end.flatten
   end
   
-  def create_houses(attributes)
-    numbers = extract_numbers(attributes.delete(:numbers))
-    numbers.each do |number|
-      house = House.create(attributes.merge(:number => number))
-      puts ("%30s %4s" % [house.street && house.street.name || "-", house.number]) 
-    end
-  end
   
   def import
 	  prepare_database
 		#areas_import
     #street_import
-    houses_import
+    #houses_import
+    flats_import
   end  
   
 end
