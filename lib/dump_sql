@@ -10,5 +10,10 @@ for table in $tables ; do
 	echo "LOAD DATA INFILE '`pwd`/dump/$table.csv' INTO TABLE $table CHARACTER SET UTF8 FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\'';" >> dump/kladr.sql
 done
 
+echo "CREATE INDEX areas_region_index ON areas (region_code);" >> dump/kladr.sql
+echo "CREATE INDEX areas_district_index ON areas (district_code);" >> dump/kladr.sql
+echo "CREATE INDEX areas_city_index ON areas (city_code);" >> dump/kladr.sql
+echo "CREATE INDEX areas_town_index ON areas (town_code);" >> dump/kladr.sql
+
 #sqlite3 kladr.sqlite3 .dump | grep -v "BEGIN TRANSACTION" |grep -v sqlite_sequence | grep -v COMMIT | perl -pe 's/INSERT INTO "(.*)" VALUES/INSERT INTO `\1` VALUES/' > kladr.sql
 
