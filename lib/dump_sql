@@ -15,5 +15,8 @@ echo "CREATE INDEX areas_district_index ON areas (district_code);" >> dump/kladr
 echo "CREATE INDEX areas_city_index ON areas (city_code);" >> dump/kladr.sql
 echo "CREATE INDEX areas_town_index ON areas (town_code);" >> dump/kladr.sql
 
+echo "CREATE INDEX streets_areas_index ON streets (area_id);" >> dump/kladr.sql
+echo "CREATE INDEX houses_streets_index ON houses (street_id);" >> dump/kladr.sql
+
 #sqlite3 kladr.sqlite3 .dump | grep -v "BEGIN TRANSACTION" |grep -v sqlite_sequence | grep -v COMMIT | perl -pe 's/INSERT INTO "(.*)" VALUES/INSERT INTO `\1` VALUES/' > kladr.sql
 
