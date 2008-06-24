@@ -205,10 +205,9 @@ class Kladr
   
   def import
 	  prepare_database
-		#areas_import
-    #street_import
-    #houses_import
-    flats_import
+		areas_import
+    street_import
+    houses_import
   end  
   
 end

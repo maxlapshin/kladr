@@ -1,0 +1,14 @@
+#!/bin/sh
+
+
+echo "SET NAMES UTF8;" > dump/kladr.sql
+tables=`sqlite3 kladr.sqlite3 .tables`
+for table in $tables ; do
+	echo "DROP TABLE IF EXISTS $table;" >> dump/kladr.sql
+	sqlite3 kladr.sqlite3 ".schema $table" | sed 's/autoincrement/auto_increment/'  >> dump/kladr.sql
+	[ ! -e dump/$table.csv ] && (sqlite3 -csv kladr.sqlite3 "select * from $table;" | sed "s/\"/'/" > dump/$table.csv)
+	echo "LOAD DATA INFILE '`pwd`/dump/$table.csv' INTO TABLE $table CHARACTER SET UTF8 FIELDS TERMINATED BY ',' OPTIONALLY ENCLOSED BY '\'';" >> dump/kladr.sql
+done
+
+#sqlite3 kladr.sqlite3 .dump | grep -v "BEGIN TRANSACTION" |grep -v sqlite_sequence | grep -v COMMIT | perl -pe 's/INSERT INTO "(.*)" VALUES/INSERT INTO `\1` VALUES/' > kladr.sql
+
